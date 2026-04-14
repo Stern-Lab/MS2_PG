@@ -6,7 +6,7 @@ import arviz as az
 import os
 import argparse
 from sbi import analysis as sbianalysis
-from parameters_modelAB import modelA_priors, modelB_priors
+from parameters_model_AB import modelA_priors, modelB_priors
 import matplotlib.pyplot as plt
 import seaborn as sns
 from train_AB import passages_for_simple_sumstat, append_sims_from_batches_dir, get_total_sumstat_p10

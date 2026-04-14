@@ -12,7 +12,7 @@ import json
 import multiprocessing as mp
 from functools import partial
 from simulator_model_AB import simulate
-from parameters_modelAB import passages, pop_size_A, pop_size_B,gene_probs, syn_probs_by_gene, modelA_priors, modelB_priors
+from parameters_model_AB import passages, pop_size_A, pop_size_B,gene_probs, syn_probs_by_gene, modelA_priors, modelB_priors
 import psutil
 import time
 torch.set_num_threads(1)

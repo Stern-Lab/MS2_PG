@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sbi import analysis as sbianalysis
 import torch
-from parameters_modelAB import modelA_priors, modelB_priors
+from parameters_model_AB import modelA_priors, modelB_priors
 
 class PosteriorWrapper:
     """Wrapper for a trained SNPE posterior (density estimator)."""

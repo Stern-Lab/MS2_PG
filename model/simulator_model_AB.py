@@ -1,6 +1,6 @@
 import numpy as np
 import gc
-from evolutionary_model_new import (
+from evolutionary_model_AB import (
     get_mut_type_probs_per_gene_lst_simp_model,
     get_mutations,
     wrangle_data_simplified,
