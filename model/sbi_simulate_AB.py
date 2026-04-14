@@ -12,16 +12,26 @@ import json
 import multiprocessing as mp
 from functools import partial
 from simulator_model_AB import simulate
-from parameters_model_AB import passages, pop_size_A, pop_size_B,gene_probs, syn_probs_by_gene, modelA_priors, modelB_priors
+from parameters_model_AB import (
+    passages,
+    pop_size_A,
+    gene_probs,
+    syn_probs_by_gene,
+    modelA_priors,
+    modelB_priors,
+)
 import psutil
 import time
+
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
+
 
 def get_memory_usage():
     process = psutil.Process()
     mem_info = process.memory_info()
     return mem_info.rss / 1024**2  # Convert bytes to MB
+
 
 def get_allocated_cpus(default=1) -> int:
     """Return CPUs allocated by Slurm to this task, falling back sensibly."""
@@ -32,31 +42,33 @@ def get_allocated_cpus(default=1) -> int:
     # fallback when not running under slurm (e.g., local run)
     return mp.cpu_count() if default is None else default
 
+
 # TODO: save passage_dict to pickle file (change needed in simulator_model_AB.py)
 def main(
-        output_dir,
-        seq_err_rate,
-        seq_sample_size,
-        model,
-        fixed_params_lst, # change to dict??
-        simulate_sequence_sampling = True,
-        ensemble_size=1,
-        long_sumstat=0,
-        simulations_per_batch=1000,
-        index=0,
-
+    output_dir,
+    seq_err_rate,
+    seq_sample_size,
+    model,
+    fixed_params_lst,  # change to dict??
+    simulate_sequence_sampling=True,
+    ensemble_size=1,
+    long_sumstat=0,
+    simulations_per_batch=1000,
+    index=0,
 ):
     start = time.time()
-    if model == 'A':
+    if model == "A":
         parameters = modelA_priors.copy()
         params_priors = modelA_priors.copy()
         pop_size = pop_size_A
-    elif model == 'B':
+    elif model == "B":
         parameters = modelB_priors.copy()
         params_priors = modelB_priors.copy()
-        pop_size = pop_size_A  # not using pop_size_B since it's the same for both models
+        pop_size = (
+            pop_size_A  # not using pop_size_B since it's the same for both models
+        )
     else:
-        raise ValueError(f'Invalid model: {model}')
+        raise ValueError(f"Invalid model: {model}")
 
     parameters.update(syn_probs_by_gene)
     parameters.update(gene_probs)
@@ -68,16 +80,26 @@ def main(
     parameters["simulate_seq_sampling"] = simulate_sequence_sampling
     parameters["fixed_params"] = fixed_params_lst
     parameters["model"] = model
-    parameters['sumstat'] = 'LRG' if long_sumstat else 'SR'
+    parameters["sumstat"] = "LRG" if long_sumstat else "SR"
     parameters["output_dir"] = output_dir
-    parameters['batches'] = f'0-{index}'
+    parameters["batches"] = f"0-{index}"
 
     # save the parameters used for the run
     with open(f"{output_dir}/model_{model}_parameters.txt", "w") as outfile:
         json.dump(parameters, outfile)
 
-    syn_probs_by_gene_lst = [syn_probs_by_gene['p_mat_syn'], syn_probs_by_gene['p_cp_syn'], syn_probs_by_gene['p_lys_syn'], syn_probs_by_gene['p_rep_syn']]
-    gene_probs_lst = [gene_probs['p_mat'], gene_probs['p_cp'], gene_probs['p_lys'], gene_probs['p_rep']]
+    syn_probs_by_gene_lst = [
+        syn_probs_by_gene["p_mat_syn"],
+        syn_probs_by_gene["p_cp_syn"],
+        syn_probs_by_gene["p_lys_syn"],
+        syn_probs_by_gene["p_rep_syn"],
+    ]
+    gene_probs_lst = [
+        gene_probs["p_mat"],
+        gene_probs["p_cp"],
+        gene_probs["p_lys"],
+        gene_probs["p_rep"],
+    ]
 
     simulator = partial(
         simulate,
@@ -102,7 +124,8 @@ def main(
     # create output directory paths for each batch
     if ensemble_size > 1:
         dir_paths = [
-            os.path.join(output_dir, f"ensemble_batch_{x}") for x in range(ensemble_size)
+            os.path.join(output_dir, f"ensemble_batch_{x}")
+            for x in range(ensemble_size)
         ]
     else:
         dir_paths = [os.path.join(output_dir, f"batch_{index}")]
@@ -122,8 +145,9 @@ def main(
         print(f"Memory before simulation: {get_memory_usage()} MB", flush=True)
 
         try:
-
-            allocated_cpus = get_allocated_cpus(default=None)  # None => use mp.cpu_count() when not in Slurm
+            allocated_cpus = get_allocated_cpus(
+                default=None
+            )  # None => use mp.cpu_count() when not in Slurm
             num_of_workers_slurm = min(max(1, allocated_cpus - 1), 20)
 
             print(
@@ -147,8 +171,6 @@ def main(
     print(f"Inference time: {end - start} seconds")
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -165,10 +187,18 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--model", type=str,choices=['A','B'], required=True, help="'A' is for model A-MOI01, 'B' is for model B-MOI10"
+        "--model",
+        type=str,
+        choices=["A", "B"],
+        required=True,
+        help="'A' is for model A-MOI01, 'B' is for model B-MOI10",
     )
     parser.add_argument(
-        "--fixed_params_lst", nargs='+', type=float, required=True, help="list of fixed parameters"
+        "--fixed_params_lst",
+        nargs="+",
+        type=float,
+        required=True,
+        help="list of fixed parameters",
     )
 
     parser.add_argument(
@@ -206,5 +236,4 @@ if __name__ == "__main__":
         long_sumstat=args.long_sumstat,
         simulations_per_batch=args.s,
         index=args.i,
-
     )

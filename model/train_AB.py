@@ -1,6 +1,5 @@
 # inference with NPE
 import os
-import numpy as np
 import torch
 import json
 import pickle
@@ -42,18 +41,19 @@ PARAM_NAMES_B = [
     "p_rep_nonsyn_rec",
 ]
 
+
 def append_sims_from_batches_dir(xs, thetas, batches_dir):
     """
     returns a list of tensors
     """
     for batch_name in os.listdir(batches_dir):
-        if ('parameters' in batch_name) or ('README' in batch_name):
+        if ("parameters" in batch_name) or ("README" in batch_name):
             continue
         # if ((int(batch_name[6:]) > 40)):
         #     break
-            #(int(batch_name[6:]) < 38) and (int(batch_name[6:])!=24)
-            # JUST FOR TRAINING ON A SMALL DATA SET, SINCE NOT ALL DIRS ARE READY. batch 24 is empty.
-        print(f'{batch_name=}', flush=True)
+        # (int(batch_name[6:]) < 38) and (int(batch_name[6:])!=24)
+        # JUST FOR TRAINING ON A SMALL DATA SET, SINCE NOT ALL DIRS ARE READY. batch 24 is empty.
+        print(f"{batch_name=}", flush=True)
         batch_path = os.path.join(batches_dir, batch_name)
         xs.append(torch.load(os.path.join(batch_path, "x_all_passages.pt")))
         thetas.append(torch.load(os.path.join(batch_path, "theta.pt")))
@@ -61,7 +61,7 @@ def append_sims_from_batches_dir(xs, thetas, batches_dir):
 
 
 def get_prior_from_params(params, model):
-    params_names = PARAM_NAMES_A if model=='A' else PARAM_NAMES_B
+    params_names = PARAM_NAMES_A if model == "A" else PARAM_NAMES_B
     prior_ = {k: v for k, v in params.items() if k in params_names}
 
     prior = sbiutils.BoxUniform(
@@ -69,6 +69,7 @@ def get_prior_from_params(params, model):
         high=torch.as_tensor([val[1] for val in prior_.values()]),
     )
     return prior
+
 
 def passages_for_simple_sumstat(xs, passages=[5, 8, 10]):
     """
@@ -91,6 +92,7 @@ def passages_for_simple_sumstat(xs, passages=[5, 8, 10]):
     sumstat = torch.cat(avg_muts_for_passages, dim=1)
     return sumstat
 
+
 def get_total_sumstat_p10(xs):
     """
     default sumstat is of length 110+3003 (passages 0 to 10 nonsyn-ada/nonada for each protein and total syn ada/nonada)+genotype sumstat.
@@ -103,25 +105,28 @@ def get_total_sumstat_p10(xs):
     final sumstat of each simulation. shape(num_sims, 10*len(passages)+3003)
 
     """
-    sumstat = xs[:,100:]
+    sumstat = xs[:, 100:]
 
     return sumstat
 
 
 def assign_embedding_net(sumstat):
-    if sumstat=='LRG':
-        embedding_net = nn.Sequential(nn.Linear(3013, 512),
-                                      nn.LayerNorm(512),
-                                      nn.ReLU(),
-                                      nn.Linear(512, 128),
-                                      nn.LayerNorm(128),
-                                      nn.ReLU(),
-                                      nn.Linear(128, 16))
-    elif sumstat=='SR':
+    if sumstat == "LRG":
+        embedding_net = nn.Sequential(
+            nn.Linear(3013, 512),
+            nn.LayerNorm(512),
+            nn.ReLU(),
+            nn.Linear(512, 128),
+            nn.LayerNorm(128),
+            nn.ReLU(),
+            nn.Linear(128, 16),
+        )
+    elif sumstat == "SR":
         embedding_net = nn.Identity()
     else:
-        raise Exception(f'sumstat should be one of [LRG, SR] not {sumstat}!')
+        raise Exception(f"sumstat should be one of [LRG, SR] not {sumstat}!")
     return embedding_net
+
 
 def train_ensemble(
     i,
@@ -133,7 +138,7 @@ def train_ensemble(
     num_sim,
     ensemble_size,
     output_path,
-    sumstat='SR'
+    sumstat="SR",
 ):
     # assert ensemble_mode in ['vanilla', 'bagging', 'ultra_bagging','big_estimator'], "invalid ensemble mode"
     # bagging = False
@@ -164,14 +169,18 @@ def train_ensemble(
 
 
 def train_big_estimator(
-    prior, x, theta, stop_after_epochs, num_sim, ensemble_size, output_path,sumstat='SR'
+    prior,
+    x,
+    theta,
+    stop_after_epochs,
+    num_sim,
+    ensemble_size,
+    output_path,
+    sumstat="SR",
 ):
     embedding_net = assign_embedding_net(sumstat)
     # If my_embedding_net is None, sbiutils creates a standard MAF
-    density_estimator_build_fun = posterior_nn(
-        model='maf',
-        embedding_net=embedding_net
-    )
+    density_estimator_build_fun = posterior_nn(model="maf", embedding_net=embedding_net)
     inference = NPE(prior, density_estimator=density_estimator_build_fun)
     density_estimator = inference.append_simulations(theta, x).train(
         stop_after_epochs=stop_after_epochs, validation_fraction=0.1
@@ -180,6 +189,7 @@ def train_big_estimator(
     ending = f"big_estimator_{sumstat}_{ensemble_size * num_sim}_{stop_after_epochs}"
     with open(f"{output_path}/{ending}.pkl", "wb") as handle:
         pickle.dump(posterior, handle)
+
 
 def main(
     training_path,
@@ -195,15 +205,19 @@ def main(
     assert big_or_ensemble in ["big_estimator", "ensemble"], (
         "invalid mode, could be one big_estimator or ultra-bagging ensemble"
     )
-    k = (num_sim * ensemble_size)//1000
+    k = (num_sim * ensemble_size) // 1000
     os.makedirs(output_path, exist_ok=True)
-    with open(os.path.join(training_path, f"model_{model}_parameters.txt"), "r") as infile:
+    with open(
+        os.path.join(training_path, f"model_{model}_parameters.txt"), "r"
+    ) as infile:
         params = json.load(infile)
     params["sims_per_model"] = num_sim
     params["ensemble_size"] = ensemble_size
     params["batches_dir"] = training_path
     params["big_or_ensemble"] = big_or_ensemble
-    with open(os.path.join(output_path, f"parameters_train_model{model}_{k}k.txt"), "w") as outfile:
+    with open(
+        os.path.join(output_path, f"parameters_train_model{model}_{k}k.txt"), "w"
+    ) as outfile:
         json.dump(params, outfile)
 
     prior = get_prior_from_params(params, model)
@@ -224,7 +238,9 @@ def main(
     tensor_all_xs = tensor_xs.reshape(
         real_num_of_batches * real_sim_num, s
     )  # 80000: 8 batches, 10000 simulations per batch
-    tensor_all_thetas = tensor_thetas.reshape(real_num_of_batches * real_sim_num, num_of_params)  # 12 number of parameters of the model
+    tensor_all_thetas = tensor_thetas.reshape(
+        real_num_of_batches * real_sim_num, num_of_params
+    )  # 12 number of parameters of the model
 
     if num_sim * ensemble_size < real_sim_num * real_num_of_batches:
         tensor_all_xs = tensor_all_xs[: num_sim * ensemble_size, :]
@@ -236,11 +252,11 @@ def main(
 
     if total_sumstat:
         x_sumstat = get_total_sumstat_p10(tensor_all_xs)
-        name = 'LRG'
+        name = "LRG"
     else:
         x_sumstat = passages_for_simple_sumstat(tensor_all_xs, [10])
-        name = 'SR'
-    print(f'{total_sumstat=},sumstat: {name}, {x_sumstat.shape=}', flush=True)
+        name = "SR"
+    print(f"{total_sumstat=},sumstat: {name}, {x_sumstat.shape=}", flush=True)
 
     if big_or_ensemble == "big_estimator":
         train_big_estimator(
@@ -251,10 +267,10 @@ def main(
             num_sim,
             ensemble_size,
             output_path,
-            name
+            name,
         )
 
-    elif big_or_ensemble=='ensemble':
+    elif big_or_ensemble == "ensemble":
         posterior_list = []
         print(f"{ensemble_size=}\n {type(ensemble_size)=}\n")
         for i in range(ensemble_size):
@@ -270,7 +286,7 @@ def main(
                 num_sim,
                 ensemble_size,
                 output_path,
-                name
+                name,
             )
 
         train_ensemble(
@@ -283,11 +299,13 @@ def main(
             num_sim,
             ensemble_size,
             output_path,
-            name
+            name,
         )
 
     else:
-        raise ValueError(f"Invalid big_or_ensemble value: {big_or_ensemble}. should be 'big_estimator' or 'ensemble'")
+        raise ValueError(
+            f"Invalid big_or_ensemble value: {big_or_ensemble}. should be 'big_estimator' or 'ensemble'"
+        )
 
     end = time.time()
     print(f"Inference time: {end - start} seconds")
@@ -311,7 +329,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        choices=['A','B'],
+        choices=["A", "B"],
         required=True,
         help="model A or B",
     )
@@ -322,16 +340,18 @@ if __name__ == "__main__":
         help="ensemble (ultra bagging)/big_estimator",
     )
     parser.add_argument(
-         "--stop_after_epochs", type=int, default=100, help="num of epochs"
+        "--stop_after_epochs", type=int, default=100, help="num of epochs"
     )
     parser.add_argument(
         "--num_sim", type=int, default=1000, help="num of simulations per batch"
     )
+    parser.add_argument("--ensemble_size", type=int, default=10, help="ensemble size")
     parser.add_argument(
-        "--ensemble_size", type=int, default=10, help="ensemble size"
-    )
-    parser.add_argument(
-        "--total_sumstat", type=int,choices=[0,1], default=0, help="use total sumstat. use 1 for true and 0 for false"
+        "--total_sumstat",
+        type=int,
+        choices=[0, 1],
+        default=0,
+        help="use total sumstat. use 1 for true and 0 for false",
     )
 
     args = parser.parse_args()

@@ -192,7 +192,6 @@ def get_mut_type_probs_per_gene_lst(
                p(protein, nonsyn, !ada, dom), p(protein, syn, ada), p(protein, nonsyn, ada)]
     """
 
-
     P_sr = p_protein_syn * (1 - p_ada_syn) * p_protein_syn_rec
     P_sd = p_protein_syn * (1 - p_ada_syn) * (1 - p_protein_syn_rec)
     P_nsr = (1 - p_protein_syn) * (1 - p_ada_nonsyn) * p_protein_nonsyn_rec
@@ -297,7 +296,7 @@ def collapse_into_simplified_geno_structure(full_genotype_dict):
 def collapse_into_simplified_geno_structure_fast(full_genotype_dict):
     # 1. Create a DataFrame directly
     df = pd.DataFrame(list(full_genotype_dict.keys()))
-    df['prob'] = list(full_genotype_dict.values())
+    df["prob"] = list(full_genotype_dict.values())
 
     # 2. Define your columns (same indices as your code)
     nonsyn_cols = [0, 1, 2, 5, 6, 7, 10, 11, 12, 15, 16, 17]
@@ -309,15 +308,16 @@ def collapse_into_simplified_geno_structure_fast(full_genotype_dict):
     for i, col_idx in enumerate(nonsyn_cols):
         simplified[i] = df[col_idx]
 
-    simplified['tot_syn_ada'] = df[syn_ada_cols].sum(axis=1)
-    simplified['tot_syn_nonada'] = df[syn_nonada_cols].sum(axis=1)
-    simplified['prob'] = df['prob']
+    simplified["tot_syn_ada"] = df[syn_ada_cols].sum(axis=1)
+    simplified["tot_syn_nonada"] = df[syn_nonada_cols].sum(axis=1)
+    simplified["prob"] = df["prob"]
 
     # 4. Group by all columns except 'prob' and sum the probabilities
-    final_df = simplified.groupby(list(range(len(nonsyn_cols))) + ['tot_syn_ada', 'tot_syn_nonada']).sum()
+    final_df = simplified.groupby(
+        list(range(len(nonsyn_cols))) + ["tot_syn_ada", "tot_syn_nonada"]
+    ).sum()
 
-    return final_df['prob'].to_dict()
-
+    return final_df["prob"].to_dict()
 
 
 def gather_muts_by_fitness_simplified(simplified_genotypes):
@@ -347,6 +347,7 @@ def gather_muts_by_fitness_simplified(simplified_genotypes):
     )
     return gathered_df
 
+
 def gather_muts_by_fitness_simplified_by_gene(simplified_genotypes):
     """
     create a sub genotype matrix with columns for the dominant mutations (recessive mutations have fitness 1 and
@@ -371,7 +372,15 @@ def gather_muts_by_fitness_simplified_by_gene(simplified_genotypes):
         simplified_genotypes[:, [2, 5, 8, 11, 12]], axis=1
     ).reshape(-1, 1)  # nonsyn per gene + total syn
     gathered_df = np.concatenate(
-        [syn_nonada, mat_nonsyn_dom, cp_nonsyn_dom, lys_nonsyn_dom, rep_nonsyn_dom, all_beneficial_muts], axis=1
+        [
+            syn_nonada,
+            mat_nonsyn_dom,
+            cp_nonsyn_dom,
+            lys_nonsyn_dom,
+            rep_nonsyn_dom,
+            all_beneficial_muts,
+        ],
+        axis=1,
     )
     return gathered_df
 
@@ -437,14 +446,18 @@ def genotype_probabilities(
     }  # min_freq is the same along the way, may need to lower it here becuase I multiply 4 probs..
 
 
-def genotype_probabilities_with_audit(gene_mutation_distribution, mutation_type_probs_per_gene, min_freq):
+def genotype_probabilities_with_audit(
+    gene_mutation_distribution, mutation_type_probs_per_gene, min_freq
+):
     genotype_dict = {}
     total_leaked_prob = 0.0
 
     for gene_counts, p_gene_counts in gene_mutation_distribution.items():
         gene_type_options = []
         for i, mut_count in enumerate(gene_counts):
-            combos = gene_mutation_type_combinations(mut_count, mutation_type_probs_per_gene[i], min_freq)
+            combos = gene_mutation_type_combinations(
+                mut_count, mutation_type_probs_per_gene[i], min_freq
+            )
             if not combos:
                 # If we skip this, we lose the entire p_gene_counts mass
                 total_leaked_prob += p_gene_counts
@@ -456,7 +469,9 @@ def genotype_probabilities_with_audit(gene_mutation_distribution, mutation_type_
                 joint_prob = p_gene_counts * np.prod([c[1] for c in combination])
                 if joint_prob > min_freq:
                     genotype_vector = sum([c[0] for c in combination], ())
-                    genotype_dict[genotype_vector] = genotype_dict.get(genotype_vector, 0) + joint_prob
+                    genotype_dict[genotype_vector] = (
+                        genotype_dict.get(genotype_vector, 0) + joint_prob
+                    )
                 else:
                     total_leaked_prob += joint_prob
 
@@ -606,7 +621,7 @@ def mutate_and_select_optimized(
     mutations_freqs,
     fitness_effects,
     tuple_size,
-    simplified = True,
+    simplified=True,
     batch_size=100,
 ):
     freqs_dict = defaultdict(float)
@@ -655,7 +670,7 @@ def normalize_freqs_dict(freqs_dict, pop_size):
     arguments:
     freqs_dict -- dict of genotypes and their frequencies {genotype:freq}
     """
-    min_freq = 10*pop_size if pop_size < 100000 else pop_size
+    min_freq = 10 * pop_size if pop_size < 100000 else pop_size
     freqs_dict = {
         key: val for key, val in freqs_dict.items() if val > (1 / min_freq)
     }  # to prevent occasional bugs
@@ -721,9 +736,8 @@ def simulate_next_passage_new(
     return freqs_dict
 
 
-
 def simulate_next_passage_final(
-        fitness_effects, passage, mutations, pop_size, simplified, chunk_size=500
+    fitness_effects, passage, mutations, pop_size, simplified, chunk_size=500
 ):
     """
     Complete passage simulation: Mutation -> Selection -> Chunked Aggregation -> Drift.
@@ -743,8 +757,8 @@ def simulate_next_passage_final(
 
     # 2. Chunked Mutation & Selection
     for i in range(0, len(genotypes), chunk_size):
-        g_chunk = genotypes[i: i + chunk_size]
-        f_chunk = genotypes_freqs[i: i + chunk_size]
+        g_chunk = genotypes[i : i + chunk_size]
+        f_chunk = genotypes_freqs[i : i + chunk_size]
 
         # Broadcasting: (C, 1, 24) + (M, 24) -> (C*M, 24)
         new_genos = (g_chunk[:, np.newaxis, :] + mutation_keys).reshape(-1, tuple_size)
@@ -759,9 +773,11 @@ def simulate_next_passage_final(
 
         # Early Collapse: Combine identical genotypes within this chunk
         df_chunk = pd.DataFrame(new_genos)
-        df_chunk['f'] = new_freqs
+        df_chunk["f"] = new_freqs
         # Group by all genotype columns and sum frequencies
-        collapsed = df_chunk.groupby(list(range(tuple_size)), sort=False).sum().reset_index()
+        collapsed = (
+            df_chunk.groupby(list(range(tuple_size)), sort=False).sum().reset_index()
+        )
         all_chunks.append(collapsed)
 
     # 3. Global Aggregation
@@ -770,11 +786,11 @@ def simulate_next_passage_final(
 
     # 4. Global Normalization
     # This is where 'Average Fitness' happens correctly across the whole population
-    total_mass = full_df['f'].sum()
-    full_df['f'] /= total_mass
+    total_mass = full_df["f"].sum()
+    full_df["f"] /= total_mass
 
     # Convert to dictionary for the Drift/Sampling function
-    freqs_dict = {tuple(k): v for k, v in zip(full_df.index, full_df['f'])}
+    freqs_dict = {tuple(k): v for k, v in zip(full_df.index, full_df["f"])}
 
     # 5. Clean up memory
     del genotypes, mutation_keys, all_chunks, full_df
@@ -786,7 +802,6 @@ def simulate_next_passage_final(
     freqs_dict = multinomial_sampling(freqs_dict, pop_size)
 
     return freqs_dict
-
 
 
 def wrangle_data(passage):
@@ -948,8 +963,13 @@ def wrangle_data_simplified(passage):
         + data["lys_total_nonsyn"]
         + data["rep_total_nonsyn"]
     )
-    data['ada_total'] = (data['mat_nonsyn_ada'] + data['cp_nonsyn_ada'] + data['lys_nonsyn_ada']
-                         + data['rep_nonsyn_ada'] + data['total_syn_ada'])
+    data["ada_total"] = (
+        data["mat_nonsyn_ada"]
+        + data["cp_nonsyn_ada"]
+        + data["lys_nonsyn_ada"]
+        + data["rep_nonsyn_ada"]
+        + data["total_syn_ada"]
+    )
 
     # add more columns if needed for a more detailed summary statistic (for example one with tagged adaptive muts)
     print(
@@ -1048,18 +1068,42 @@ def get_expanded_sumstat_simplified(df, passages_lst):
 
 
 def get_genotype_sumstat(df):
-    max_muts = 9 # so 8 maximum muts
-    new_index = [(mat, cp, lys, rep, ada, syn) for mat in range(max_muts) for cp in range(max_muts)
-                 for lys in range(max_muts) for rep in range(max_muts) for ada in range(max_muts)
-                 for syn in range(max_muts) if mat+cp+lys+rep+ada+syn<max_muts]
-    grouped = df.groupby(['mat_nonsyn_nonada', 'cp_nonsyn_nonada', 'lys_nonsyn_nonada', 'rep_nonsyn_nonada','ada_total', 'total_syn_nonada'])[10].sum()
+    max_muts = 9  # so 8 maximum muts
+    new_index = [
+        (mat, cp, lys, rep, ada, syn)
+        for mat in range(max_muts)
+        for cp in range(max_muts)
+        for lys in range(max_muts)
+        for rep in range(max_muts)
+        for ada in range(max_muts)
+        for syn in range(max_muts)
+        if mat + cp + lys + rep + ada + syn < max_muts
+    ]
+    grouped = df.groupby(
+        [
+            "mat_nonsyn_nonada",
+            "cp_nonsyn_nonada",
+            "lys_nonsyn_nonada",
+            "rep_nonsyn_nonada",
+            "ada_total",
+            "total_syn_nonada",
+        ]
+    )[10].sum()
     return torch.Tensor(grouped.reindex(new_index).fillna(0).values.flatten())
 
 
 def get_full_geno_sumstat(df):
     binned_categories = [
-        "mat_nonsyn_nonada","mat_nonsyn_ada", "cp_nonsyn_nonada","cp_nonsyn_ada", "lys_nonsyn_nonada", "lys_nonsyn_ada",
-        "rep_nonsyn_nonada","rep_nonsyn_ada", "total_syn_nonada", "total_syn_ada"
+        "mat_nonsyn_nonada",
+        "mat_nonsyn_ada",
+        "cp_nonsyn_nonada",
+        "cp_nonsyn_ada",
+        "lys_nonsyn_nonada",
+        "lys_nonsyn_ada",
+        "rep_nonsyn_nonada",
+        "rep_nonsyn_ada",
+        "total_syn_nonada",
+        "total_syn_ada",
     ]
 
     # Apply Transformation: 0->0, 1-2->1, 3-4->2, 5-6->3, 7-8->4
@@ -1081,17 +1125,35 @@ def get_full_geno_sumstat(df):
             yield tuple(res)
 
     new_index = list(generate_indexing(10, 6 - 1))
-    grouped = df.groupby(['mat_nonsyn_nonada_binned','mat_nonsyn_ada_binned', 'cp_nonsyn_nonada_binned', 'cp_nonsyn_ada_binned',
-                          'lys_nonsyn_nonada_binned','lys_nonsyn_ada_binned', 'rep_nonsyn_nonada_binned','rep_nonsyn_ada_binned',
-                          'total_syn_nonada_binned', 'total_syn_ada_binned'])[10].sum()
+    grouped = df.groupby(
+        [
+            "mat_nonsyn_nonada_binned",
+            "mat_nonsyn_ada_binned",
+            "cp_nonsyn_nonada_binned",
+            "cp_nonsyn_ada_binned",
+            "lys_nonsyn_nonada_binned",
+            "lys_nonsyn_ada_binned",
+            "rep_nonsyn_nonada_binned",
+            "rep_nonsyn_ada_binned",
+            "total_syn_nonada_binned",
+            "total_syn_ada_binned",
+        ]
+    )[10].sum()
     return torch.Tensor(grouped.reindex(new_index).fillna(0).values.flatten())
-
 
 
 def get_full_geno_sumstat_all_passages(df):
     binned_categories = [
-        "mat_nonsyn_nonada","mat_nonsyn_ada", "cp_nonsyn_nonada","cp_nonsyn_ada", "lys_nonsyn_nonada", "lys_nonsyn_ada",
-        "rep_nonsyn_nonada","rep_nonsyn_ada", "total_syn_nonada", "total_syn_ada"
+        "mat_nonsyn_nonada",
+        "mat_nonsyn_ada",
+        "cp_nonsyn_nonada",
+        "cp_nonsyn_ada",
+        "lys_nonsyn_nonada",
+        "lys_nonsyn_ada",
+        "rep_nonsyn_nonada",
+        "rep_nonsyn_ada",
+        "total_syn_nonada",
+        "total_syn_ada",
     ]
 
     binned_names = [f"{col}_binned" for col in binned_categories]
@@ -1101,7 +1163,9 @@ def get_full_geno_sumstat_all_passages(df):
         new_col_name = f"{col}_binned"
         # Ensure the column exists before applying
         if col in df.columns:
-            df[new_col_name] = df[col].apply(lambda x: (int(x) + 1) // 2 if x > 0 else 0)
+            df[new_col_name] = df[col].apply(
+                lambda x: (int(x) + 1) // 2 if x > 0 else 0
+            )
 
     # 2. Reconstruct the static indexing (3003 entries)
     def generate_indexing(n_categories, max_total):
@@ -1120,7 +1184,7 @@ def get_full_geno_sumstat_all_passages(df):
     passage_stats = []
     for p in range(1, 11):
         # p_col = int(p)  # Using string if column names are '1', '2', etc.
-        
+
         if p not in df.columns:
             # If a passage column is missing, append 3003 zeros
             passage_stats.append(torch.zeros(len(new_index)))
@@ -1138,6 +1202,7 @@ def get_full_geno_sumstat_all_passages(df):
     return torch.cat(passage_stats)
 
 
-
 def get_total_sumstat(df, passages_lst):
-    return torch.cat((get_expanded_sumstat_simplified(df,passages_lst), get_full_geno_sumstat(df)))
+    return torch.cat(
+        (get_expanded_sumstat_simplified(df, passages_lst), get_full_geno_sumstat(df))
+    )
