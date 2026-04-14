@@ -23,7 +23,6 @@ def calculate_coverage_and_accuracy(
         num_samples=1000,
         hdi_prob=0.95
 ):
-    # TODO: add more hdi probs (turn hdi_prob to a list)
     """
     Args:
         test_theta: torch.Tensor or np.array of true parameters [n_sims, n_params]
@@ -258,7 +257,8 @@ def plot_diagnostics_log_ratio(df, output_dir, param_to_name, num_of_sims):
     axes_flat = axes.flatten()
 
     for i, p_name in enumerate(params):
-        if i >= 12: break
+        if i >= 12:
+            break
 
         sub_df = df[df['parameter'] == p_name]
 
@@ -315,24 +315,7 @@ def main(test_data_path, posterior_path, model, output_dir, num_of_sims, total_s
         k = True
     else:
         k = False
-    param_to_name2 = {
-        'mu': r'Mutation Rate ($\mu$)',
-        'w_syn': r'Syn effect ($\omega_{syn}$)',
-        'w_nonsyn_mat': r'Mat non-syn effect ($\omega_{ns{,}mat}$)',
-        'w_nonsyn_cp': r'Cp non-syn effect ($\omega_{ns{,}cp}$)',
-        'w_nonsyn_lys': r'Lys non-syn effect ($\omega_{ns{,}lys}$)',
-        'w_nonsyn_rep': r'Rep non-syn effect ($\omega_{ns{,}rep}$)',
-        'w_ada': r'Adaptive effect ($\omega_{ada}$)',
-        'p_ada_syn': r'Adaptive syn prob ($P_{ada{,}syn}$)',
-        "p_ada_ns_mat": r'Adaptive mat non-syn prob ($P_{ada{,}ns{,}mat}$)',
-        "p_ada_ns_cp": r'Adaptive cp non-syn prob ($P_{ada{,}ns{,}cp}$)',
-        "p_ada_ns_lys": r'Adaptive lys non-syn prob ($P_{ada{,}ns{,}lys}$)',
-        "p_ada_ns_rep": r'Adaptive rep non-syn prob ($P_{ada{,}ns{,}rep}$)',
-        "p_mat_nonsyn_rec": r'Mat recessive prob ($P_{mat{,}ns{,}rec}$)',
-        "p_cp_nonsyn_rec": r'Cp recessive prob ($P_{cp{,}ns{,}rec}$)',
-        "p_lys_nonsyn_rec": r'Lys recessive prob ($P_{lys{,}ns{,}rec}$)',
-        "p_rep_nonsyn_rec": r'Rep recessive prob ($P_{rep{,}ns{,}rec}$)',
-    }
+
     # estimator_path = os.path.join(output_path, 'big_estimator.pkl')
     test_xs = []
     test_thetas = []
