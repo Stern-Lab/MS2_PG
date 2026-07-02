@@ -4,25 +4,15 @@ Code and data for inferring protein-specific public goods (complementation) effe
 
 ---
 
-## Overview
+## Abstract
+Interactions among individuals in structured populations can alter fitness effects of mutations and reshape evolutionary processes. In many systems, including bacteria, yeast, and viruses, such interactions often result in public goods: gene products that are costly to produce yet exploitable by others. During viral coinfection of the same cell, gene products from one genome may complement deleterious mutations in another, allowing defective genomes to persist. Yet it remains difficult to infer which proteins are shareable from population sequencing data, because mutation, selection, drift, and complementation are intertwined. Here, we developed a quantitative framework to infer protein-specific public goods in the RNA bacteriophage MS2, which encodes only four proteins. We analyzed experimental evolution data generated under two multiplicity-of-infection (MOI) regimes: low MOI, where coinfection is rare, and high MOI, where coinfection is common. We first compared empirical mutation patterns between regimes and then applied a Wright-Fisher model combined with simulation-based Bayesian inference using neural posterior estimation. In a two-stage strategy, gene-specific fitness effects were inferred from low-MOI data and subsequently used to estimate protein sharing under high-MOI conditions. Across two statistical inference frameworks, lysis emerged as the strongest public-good candidate, replicase and coat showed an intermediate signal, and maturation showed the weakest evidence for sharing. Together, our results show that viral proteins differ markedly in their propensity to act as public goods. More broadly, they illustrate how coinfection can generate density-dependent selection, a general feature of social evolution that may shape evolutionary dynamics.
 
-RNA viruses frequently experience co-infection, allowing gene products to be shared between genomes. This repository contains the code used to infer which MS2 bacteriophage proteins behave as public goods under co-infection.
-
-We combine:
-
-* Experimental evolution under low and high multiplicity of infection (MOI)
-* A stochastic evolutionary model
-* Simulation-based inference using Neural Posterior Estimation (NPE)
-
-to quantify protein-specific complementation effects.
-
----
 
 ## Repository structure
 
-* `data/` - processed sequencing data and summary statistics TODO!!
-* `analysis/` – notebooks for preprocessing, empirical data analysis, and plotting
-* `model/` – simulation, parameter definition, training, and evaluation code
+* `data/` - processed sequencing data and summary statistics
+* `data_analysis` - preprocessing and data analysis
+* `model/` – evolutionary model simulation, parameter definition, training and evaluation code
   * `parameters_model_AB.py` – model parameter definitions and configuration
   * `evolutionary_model_AB.py` – core evolutionary model
   * `simulator_model_AB.py` – simulation framework
@@ -30,6 +20,7 @@ to quantify protein-specific complementation effects.
   * `train_AB.py` – training of the NPE model
   * `test_empirical_AB.py` – inference on empirical data
   * `test_nn_performance_AB.py` – neural network performance and diagnostics
+* `visualizations` - notebook for visalizations and plotting
 
 ---
 
@@ -55,8 +46,6 @@ conda activate ms2_pg
 
 This repository includes processed data used for analysis.
 
-Raw sequencing data is available at: [ADD LINK] TODO!!
-
 ---
 
 ## Evolutionary model
@@ -68,7 +57,7 @@ Key processes:
 * Mutation (genome-wide rate μ)
 * Selection (gene-specific fitness effects)
 * Drift (finite population sampling)
-* Complementation (protein-specific “recessiveness” parameters)
+* Complementation (protein-specific "recessiveness" parameters)
 
 Genotypes are represented in a reduced form capturing mutation counts per gene and mutation type.
 
@@ -123,7 +112,7 @@ python ?
 
 If you use this code, please cite:
 
-[Your paper / preprint]
+
 
 ---
 

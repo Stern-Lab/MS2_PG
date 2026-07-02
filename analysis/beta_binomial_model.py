@@ -11,7 +11,7 @@ import arviz as az
 # ============================================================
 
 # -----------------------------
-# 1. Preprocess data
+# Preprocess data
 # -----------------------------
 
 def prepare_mutation_df(
@@ -60,10 +60,8 @@ def prepare_mutation_df(
     if exclude_stop_codons:
         df_low = df_low[~df_low["stop_codon"].astype(bool)].copy()
 
-    # response
     df_low["y"] = df_low["read_count"].astype(int)
 
-    # total reads covering gene
     df_low["n"] = np.round(df_low["read_count"] / df_low["freq"]).astype(int)
 
     df_low["MOI10"] = (df_low["MOI"] == 10).astype(int)
@@ -90,7 +88,7 @@ def prepare_mutation_df(
 
 
 # -----------------------------
-# 2. Fit model
+# Fit model
 # -----------------------------
 
 def fit_beta_binomial_moi_model(
@@ -106,7 +104,7 @@ def fit_beta_binomial_moi_model(
     Fit hierarchical beta-binomial model with:
     - protein baseline effects
     - protein-specific MOI10 effects
-    - random experiment/line intercept
+    - random experiment intercept
     """
 
     protein_idx = df_low["protein"].cat.codes.values
@@ -189,18 +187,10 @@ def fit_beta_binomial_moi_model(
 
 
 # -----------------------------
-# 3. Summarize results
+# Summarize results
 # -----------------------------
 
 def summarize_moi_model(trace, reference_protein="mat"):
-    """
-    Extract:
-    1. posterior summary
-    2. P(MOI10 effect > 0)
-    3. Bayesian p-like quantity P(MOI10 effect <= 0)
-    4. contrasts against reference protein
-    """
-
     summary = az.summary(
         trace,
         var_names=["moi10_effect", "sigma_experiment", "kappa"],
@@ -248,9 +238,6 @@ def summarize_moi_model(trace, reference_protein="mat"):
     return summary, prob_positive, bayes_p_like, contrasts_df
 
 
-# -----------------------------
-# 4. Wrapper
-# -----------------------------
 
 def run_moi_mutation_model(
     df,
