@@ -11,7 +11,7 @@ Interactions among individuals in structured populations can alter fitness effec
 ## Repository structure
 
 * `data/` - processed sequencing data and summary statistics
-* `data_analysis` - preprocessing and data analysis
+* `analysis` - preprocessing, data analysis and visualiziations
 * `model/` – evolutionary model simulation, parameter definition, training and evaluation code
   * `parameters_model_AB.py` – model parameter definitions and configuration
   * `evolutionary_model_AB.py` – core evolutionary model
@@ -20,7 +20,6 @@ Interactions among individuals in structured populations can alter fitness effec
   * `train_AB.py` – training of the NPE model
   * `test_empirical_AB.py` – inference on empirical data
   * `test_nn_performance_AB.py` – neural network performance and diagnostics
-* `visualizations` - notebook for visalizations and plotting
 
 ---
 
@@ -39,12 +38,6 @@ Create environment:
 conda env create -f environment.yml
 conda activate ms2_pg
 ```
-
----
-
-## Data
-
-This repository includes processed data used for analysis.
 
 ---
 
@@ -103,8 +96,12 @@ python ?
 | Parameter | Meaning                        |
 | --------- | ------------------------------ |
 | μ         | mutation rate                  |
+| ω_syn     | synonymous fitness             |
+| ω_ada     | adaptive fitness               |
 | ω_ns^(i)  | nonsynonymous fitness per gene |
-| p_rec^(i) | probability of complementation |
+| p_syn,ada | probability of synonymous adaptive mutation |
+| p_ns,ada^(i) | probability of adaptive mutation per gene |
+| p_ns,rec^(i) | probability of complementation per gene |
 
 ---
 
