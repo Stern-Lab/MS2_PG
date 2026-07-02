@@ -71,23 +71,6 @@ Workflow:
 
 See `model/` for implementation details.
 
----
-
-## Reproducing results
-
-To reproduce the main results:
-
-### 1. Generate simulations
-TODO!!
-```bash
-python ?
-```
-
-### 2. Train inference model
-
-```bash
-python ?
-```
 
 ---
 
@@ -105,13 +88,6 @@ python ?
 
 ---
 
-## Citation
-
-If you use this code, please cite:
-
-
-
----
 
 ## Acknowledgments
 
