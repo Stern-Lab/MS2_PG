@@ -18,81 +18,6 @@ from train_AB import (
 # from sbi.analysis import check_sbc, run_sbc
 
 
-def calculate_coverage_and_accuracy(
-    density_estimator_path,
-    test_theta,
-    test_x,
-    param_names,
-    num_samples=1000,
-    hdi_prob=0.95,
-):
-    """
-    Args:
-        test_theta: torch.Tensor or np.array of true parameters [n_sims, n_params]
-        test_x: torch.Tensor or np.array of sumstats [n_sims, n_stat_dims]
-    """
-    with open(density_estimator_path, "rb") as handle:
-        posterior_obj = pickle.load(handle)
-
-    results = []
-
-    n_sims = test_x.shape[0]
-    print(f"Starting evaluation on {n_sims} simulations...", flush=True)
-
-    for i in range(n_sims):
-        true_val = (
-            test_theta[i].numpy() if torch.is_tensor(test_theta) else test_theta[i]
-        )
-        x_obs = (
-            test_x[i].unsqueeze(0)
-            if torch.is_tensor(test_x)
-            else torch.tensor([test_x[i]])
-        )
-
-        # 1. Get MAP Estimator
-        posterior_obj.set_default_x(x_obs)
-        map_estimate = posterior_obj.map().detach().cpu().numpy().flatten()
-
-        # 2. Get Samples for Coverage/HDI
-        samples = posterior_obj.sample(
-            (num_samples,), x=x_obs, show_progress_bars=True
-        ).numpy()
-
-        sim_stats = []
-        for p_idx, p_name in enumerate(param_names):
-            p_true = true_val[p_idx]
-            p_map = map_estimate[p_idx]
-            p_samples = samples[:, p_idx]
-
-            # Accuracy: Ratio and Absolute Error
-            ratio = p_map / p_true if p_true != 0 else np.nan
-            abs_error = np.abs(p_map - p_true)
-
-            # Coverage: Check if true value is within HDI
-            hdi = az.hdi(p_samples, hdi_prob=hdi_prob)
-            is_covered = (p_true >= hdi[0]) and (p_true <= hdi[1])
-
-            sim_stats.append(
-                {
-                    "sim_id": i,
-                    "parameter": p_name,
-                    "true_value": p_true,
-                    "MAP_estimate": p_map,
-                    "ratio_MAP_true": ratio,
-                    "abs_error": abs_error,
-                    "is_covered": int(is_covered),
-                    "hdi_low": hdi[0],
-                    "hdi_high": hdi[1],
-                }
-            )
-
-        results.extend(sim_stats)
-        if (i + 1) % 10 == 0:
-            print(f"Processed {i + 1}/{n_sims} simulations")
-
-    return pd.DataFrame(results)
-
-
 def calculate_coverage_lst_and_accuracy(
     density_estimator_path,
     test_theta,
@@ -169,7 +94,7 @@ def calculate_coverage_lst_and_accuracy(
     return pd.DataFrame(results)
 
 
-def summarize_test_results2(df):
+def summarize_test_results(df):
     """Aggregates accuracy and all coverage metrics found in the dataframe."""
     # Identify all coverage columns (e.g. is_covered_50, is_covered_95)
     coverage_cols = [c for c in df.columns if c.startswith("is_covered")]
@@ -181,178 +106,6 @@ def summarize_test_results2(df):
     summary = df.groupby("parameter").agg(agg_dict)
     return summary
 
-
-def summarize_test_results(df):
-    """Prints aggregate accuracy and coverage metrics."""
-    summary = df.groupby("parameter").agg(
-        {
-            "ratio_MAP_true": ["mean", "std"],
-            "is_covered": "mean",  # This is the coverage probability
-            "abs_error": "mean",
-        }
-    )
-    summary.columns = ["Ratio_Mean", "Ratio_Std", "Coverage_95", "MAE"]
-    return summary
-
-
-def plot_diagnostics_new(df, output_dir, param_to_name, num_of_sims):
-    plt.rcParams.update({"mathtext.fontset": "stix"})
-    os.makedirs(output_dir, exist_ok=True)
-
-    params = df["parameter"].unique()
-    n_params = len(params)
-
-    if num_of_sims > 1000:
-        num_of_sims = num_of_sims // 1000
-        k = True
-    else:
-        k = False
-
-    fig, axes = plt.subplots(6, 4, figsize=(20, 24))
-    axes_flat = axes.flatten()
-
-    for i, p_name in enumerate(params):
-        sub_df = df[df["parameter"] == p_name]
-        display_name = param_to_name.get(p_name, p_name)
-
-        ax_parity = axes_flat[2 * i]
-        ax_hist = axes_flat[2 * i + 1]
-
-        # --- Plot 1: (True vs. MAP) ---
-        sns.scatterplot(
-            data=sub_df, x="true_value", y="MAP_estimate", ax=ax_parity, alpha=0.6
-        )
-
-        min_val = min(sub_df["true_value"].min(), sub_df["MAP_estimate"].min())
-        max_val = max(sub_df["true_value"].max(), sub_df["MAP_estimate"].max())
-        ax_parity.plot(
-            [min_val, max_val], [min_val, max_val], "r--", label="Ideal (1:1)"
-        )
-
-        ax_parity.set_title(f"{display_name}", fontsize=12)
-        ax_parity.set_xlabel("True Value")
-        ax_parity.set_ylabel("MAP Estimate")
-
-        if i == 0:
-            ax_parity.legend(loc="upper left")
-
-        # --- Plot 2: Accuracy Histogram (Ratio) ---
-        ratios = sub_df["ratio_MAP_true"].dropna()
-        # Filter outliers (1st to 99th percentile) for visual clarity
-        ratios = ratios[ratios.between(ratios.quantile(0.01), ratios.quantile(0.99))]
-
-        sns.histplot(
-            ratios,
-            kde=True,
-            ax=ax_hist,
-            color="teal",
-            element="step",
-            fill=True,
-            alpha=0.4,
-            edgecolor="teal",
-        )
-        ax_hist.axvline(1.0, color="red", linestyle="-", label="Target (1.0)")
-
-        ax_hist.set_title(f"{display_name}", fontsize=12)
-        ax_hist.set_xlabel("MAP / True Ratio")
-        ax_hist.set_ylabel("Density")
-
-        if i == 0:
-            ax_hist.legend(loc="upper right")
-
-    # 2. Hide unused subplots
-    for j in range(2 * n_params, len(axes_flat)):
-        axes_flat[j].axis("off")
-
-    plt.suptitle("Model Inference Diagnostics", fontsize=22, y=1.02, fontweight="bold")
-    plt.tight_layout()
-
-    save_path = os.path.join(
-        output_dir,
-        f"accuracy_diagnostics_plots_{num_of_sims}{'k' if k else ''}_sims.png",
-    )
-    plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    print(f"Saved accuracy plots to {save_path}")
-
-
-def plot_diagnostics_log_ratio(df, output_dir, param_to_name, num_of_sims):
-    plt.rcParams.update({"mathtext.fontset": "stix"})
-    os.makedirs(output_dir, exist_ok=True)
-
-    params = df["parameter"].unique()
-    n_params = len(params)
-
-    if num_of_sims > 1000:
-        num_of_sims = num_of_sims // 1000
-        k = True
-    else:
-        k = False
-
-    fig, axes = plt.subplots(6, 4, figsize=(22, 24))
-    axes_flat = axes.flatten()
-
-    for i, p_name in enumerate(params):
-        if i >= 12:
-            break
-
-        sub_df = df[df["parameter"] == p_name]
-
-        display_name = param_to_name.get(p_name, p_name)
-
-        ax_parity = axes_flat[2 * i]
-        ax_hist = axes_flat[2 * i + 1]
-
-        # --- Plot 1  ---
-        sns.scatterplot(
-            data=sub_df, x="true_value", y="MAP_estimate", ax=ax_parity, alpha=0.6
-        )
-
-        min_val = min(sub_df["true_value"].min(), sub_df["MAP_estimate"].min())
-        max_val = max(sub_df["true_value"].max(), sub_df["MAP_estimate"].max())
-        ax_parity.plot(
-            [min_val, max_val], [min_val, max_val], "r--", label="Ideal (1:1)"
-        )
-
-        ax_parity.set_title(f"{display_name}", fontsize=12)
-        ax_parity.set_xlabel("True Value")
-        ax_parity.set_ylabel("MAP Estimate")
-
-        if i == 0:
-            ax_parity.legend(loc="upper left")
-
-        # --- Plot 2: Log10(MAP / True) Ratio Histogram ---
-        log_ratio = np.log10(sub_df["ratio_MAP_true"] + 1e-9)
-
-        sns.histplot(
-            log_ratio,
-            kde=True,
-            ax=ax_hist,
-            color="mediumpurple",
-            element="step",
-            fill=True,
-            alpha=0.4,
-            edgecolor="mediumpurple",
-        )
-        ax_hist.axvline(0.0, color="red", linestyle="-", label="Target (0)")
-
-        ax_hist.set_title(f"{display_name}", fontsize=12)
-        ax_hist.set_xlabel("log10(MAP Error Ratio)")
-        ax_hist.set_ylabel("Density")
-
-        if i == 0:
-            ax_hist.legend(loc="upper right")
-
-    for j in range(2 * n_params, len(axes_flat)):
-        axes_flat[j].axis("off")
-
-    plt.suptitle("Model Inference Diagnostics", fontsize=22, y=1.02, fontweight="bold")
-    plt.tight_layout()
-
-    save_path = os.path.join(
-        output_dir, f"log_ratio_diagnostics_{num_of_sims}{'k' if k else ''}_sims.png"
-    )
-    plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    print(f"Saved named diagnostic plots to {save_path}")
 
 
 def main(
@@ -397,13 +150,6 @@ def main(
     else:
         sumstat_test = passages_for_simple_sumstat(tensor_all_xs, passages=[10])
 
-    # test_results_df = calculate_coverage_and_accuracy(
-    #     posterior_path,
-    #     tensor_all_thetas,
-    #     sumstat_test,
-    #     param_names
-    # )
-
     hdi_to_test = [0.50, 0.80, 0.95]
 
     test_results_df = calculate_coverage_lst_and_accuracy(
@@ -421,16 +167,13 @@ def main(
     )
 
     # Show Summary
-    performance_summary = summarize_test_results2(test_results_df)
+    performance_summary = summarize_test_results(test_results_df)
     print("\n--- PERFORMANCE SUMMARY ---")
     print(performance_summary)
     performance_summary.to_csv(
         f"{output_dir}/nn_test_summary_metrics_{num_of_sims // 1000 if k else num_of_sims}{'k' if k else ''}_sims.csv"
     )
     print(f"performance summary saved to {output_dir}")
-    # plot_diagnostics_log_ratio(test_results_df, output_dir, param_to_name2, num_of_sims)
-    # plot_diagnostics_new(test_results_df, output_dir, param_to_name2, num_of_sims)
-    # perform_sbc_analysis(posterior_obj, test_data['thetas'], test_data['x'], param_names)
 
 
 if __name__ == "__main__":

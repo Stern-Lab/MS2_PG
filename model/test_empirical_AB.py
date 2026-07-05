@@ -88,12 +88,12 @@ def plot_posteriors(
         vals = post_df[col].values
         ax = axes_flat[i]
 
-        # 1. Plot the Posterior Histogram
+        #  Plot the Posterior Histogram
         ax.hist(
             vals, bins=bins, density=True, alpha=0.6, color="skyblue", label="Posterior"
         )
 
-        # 2. Add MAP and HDI
+        #  Add MAP and HDI
         row = stats.loc[stats["param"] == col]
         if not row.empty:
             map_val = row["MAP"].values[0]
@@ -103,14 +103,11 @@ def plot_posteriors(
             ax.axvline(map_val, color="red", linestyle="--", label="MAP")
             ax.axvspan(hdi_low, hdi_high, color="gray", alpha=0.2, label="95% HDI")
 
-        # 3. Overlay the Prior and adjust X-limits
         if priors_dict and col in priors_dict:
             prior_low, prior_high = priors_dict[col]
 
-            # Calculate height of the uniform prior
             prior_height = 1.0 / (prior_high - prior_low)
 
-            # Plot prior as a horizontal line
             ax.hlines(
                 y=prior_height,
                 xmin=prior_low,
@@ -122,7 +119,6 @@ def plot_posteriors(
             )
 
             # Ensure x-axis covers the full prior range
-            # We add a 5% margin so the line doesn't touch the plot edges
             padding = (prior_high - prior_low) * 0.05
             ax.set_xlim(prior_low - padding, prior_high + padding)
 
@@ -196,15 +192,13 @@ def main(
         flush=True,
     )
 
-    # 2. Get samples (for HDI calculation)
+    #  Get samples (for HDI calculation)
     model.sample_posterior(emp_data, num_samples=num_of_samples)
     post_df = model.get_post()
 
-    # 3. Calculate MAP using SBI optimization
-    # (Assuming self.post in your wrapper is the DirectPosterior object)
+    #  Calculate MAP using SBI optimization
     sbi_map_values = model.compute_sbi_map(emp_data)
 
-    # 4. Summarize using the high-accuracy MAP
     stats = summarize_posterior_with_sbi(post_df, sbi_map_values)
 
     print("SBI Optimized MAP Estimates:")

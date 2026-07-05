@@ -94,12 +94,11 @@ def simulate(
     sampled_params,
     syn_probs_by_gene,
     gene_probs,
-    model,  # (NEW ARGUMENT)'A' or 'B' where A infers w_nonsyn params using MOI01 and B infers p_rec using MOI10
+    model,  # 'A' or 'B' where A infers w_nonsyn params using MOI01 and B infers p_rec using MOI10
     passages,
     seq_error_rate,
     pop_size,
     fixed_params_lst,
-    # should be a list of length 4 [w_nonsyn_mat, w_nonsyn_cp, w_nonsyn_lys, w_nonsyn_rep]
     sample_size=1309,
     simulate_sequence_sampling=True,
     simplified=True,
@@ -124,7 +123,6 @@ def simulate(
 
         print("\nprocessed params")
         print(f"{simulate_sequence_sampling=}, params: {sampled_params}", flush=True)
-        # def get_mut_type_probs_per_gene_lst_simp_model(p_protein_syn, p_ada_syn,p_ada_nonsyn,p_protein_nonsyn_rec):
         mat_probs_lst = get_mut_type_probs_per_gene_lst_simp_model(
             p_mat_syn,
             model_priors_dict["p_ada_syn"],
@@ -149,10 +147,6 @@ def simulate(
             model_priors_dict["p_ada_ns_rep"],
             model_priors_dict["p_rep_nonsyn_rec"],
         )
-        # print(f"{mat_probs_lst=}\n", flush=True)
-        # print(f"{cp_probs_lst=}\n", flush=True)
-        # print(f"{lys_probs_lst=}\n", flush=True)
-        # print(f"{rep_probs_lst=}\n", flush=True)
 
         mat_probs_p0_lst = get_mut_type_probs_per_gene_lst_simp_model(
             p_mat_syn, 0, 0, model_priors_dict["p_mat_nonsyn_rec"]
@@ -194,7 +188,7 @@ def simulate(
                 model_priors_dict["w_nonsyn_rep"],
                 model_priors_dict["w_ada"],
             ]
-        )  # MAP_w_syn, MAP_w_nonsyn
+        ) 
 
         passage = dict()
 

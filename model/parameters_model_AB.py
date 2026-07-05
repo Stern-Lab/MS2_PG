@@ -13,12 +13,12 @@ gene_probs = {
     "p_lys": 0.066260,
     "p_rep": 0.476024,
 }
-passages = 10  # 10
+passages = 10  
 pop_size_A = 2 * 10**7
 pop_size_B = 10**11
 
 modelA_priors = {
-    "mu": (0.1, 0.3),  # mutation rate  -- I narrowed the prior even more
+    "mu": (0.1, 0.3),  # mutation rate 
     "w_syn": (0.85, 1),  # avg syn mutation fitness
     "w_nonsyn_mat": (0.6, 0.85),  # avg nonsyn mutation fitness
     "w_nonsyn_cp": (0.6, 0.85),  # avg nonsyn mutation fitness
@@ -33,7 +33,7 @@ modelA_priors = {
 }
 
 modelB_priors = {
-    "mu": (0.2, 0.3),  # mutation rate  -- I narrowed the prior even more
+    "mu": (0.2, 0.3),  # mutation rate 
     "w_syn": (0.9, 1),  # avg syn mutation fitness
     "w_ada": (1.25, 2),  # mat avg adaptive mutation fitness
     "p_ada_syn": (0, 0.01),  # P(adaptive | syn)

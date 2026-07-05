@@ -86,7 +86,7 @@ def multinomial_coeff(counts):
 
 def multinomial_expansion(n, mut_type_probs):
     """
-    Expands a total count `n` over categories with given probabilities.
+    Expands a total count 'n' over categories with given probabilities.
 
     Args:
         n (int): Total number of events (mutations).
@@ -140,67 +140,6 @@ def gene_mutation_type_combinations(mut_count, mutation_type_probs, min_freq):
     return {GC: prob for GC, prob in d.items() if prob > min_freq}
 
 
-"""
-probability structure:
-- chain rule 
-- p(ada|protein, syn/nonsyn) = p(ada|syn/nonsyn) -- ada is independent of the protein
-- protein -- type (syn/non) -- adaptive or not -- if not adaptive: recessive/dominant
-
-(mat can be replaced by each one of the proteins) 
-p(mat, syn, !ada, rec) = p(mat)*p(syn|mat)*p(!ada|mat, syn)*p(rec|mat,syn,!ada) = 
- = p(mat)*p(syn|mat)*p(!ada|syn)*p(rec|mat,syn,!ada) = p(mat)*p(syn|mat)*(1- p(ada|syn))*p(rec|mat,syn,!ada)
- = p_mat*p_mat_syn*(1-p_ada_syn)*p_mat_syn_rec
-
-p(mat, syn, !ada, dom) = p(mat)*p(syn|mat)*p(!ada|mat, syn)*p(dom|mat,syn,!ada) = 
- = p(mat)*p(syn|mat)*(1- p(ada|syn))*p(dom|mat,syn,!ada) = p(mat)*p(syn|mat)*(1- p(ada|syn))*(1-p(rec|mat,syn,!ada))
- = p_mat*p_mat_syn*(1-p_ada_syn)*(1-p_mat_syn_rec)
- 
-p(mat, nonsyn, !ada, rec) = p(mat)*p(nonsyn|mat)*p(!ada|mat, nonsyn)*p(rec|mat,nonsyn,!ada) = 
- = p(mat)*(1-p(syn|mat))*(1-p(ada|nonsyn))*p(rec|mat,nonsyn,!ada) = 
- = p_mat*(1-p_mat_syn)*(1-p_ada_nonsyn)*p_mat_nonsyn_rec
- 
-p(mat, nonsyn, !ada, dom) = p(mat)*p(nonsyn|mat)*p(!ada|mat, nonsyn)*p(dom|mat, nonsyn, !ada) = 
- = p(mat)*(1-p(syn|mat)*(1-p(ada|nonsyn)*(1-p(rec|mat,nonsyn,!ada)) = 
- = p_mat*(1-p_mat_syn)*(1-p_ada_nonsyn)*(1-p_mat_nonsyn_rec)
- 
-p(mat, syn, ada) = p(mat)*p(syn|mat)*p(ada|mat, syn) = p(mat)*p(syn|mat)*p(ada|syn) = 
- = p_mat*p_mat_syn*p_ada_syn
- 
-p(mat, nonsyn, ada) = p(mat)*p(nonsyn|mat)*p(ada|mat, nonsyn) = p(mat)*(1-p(syn|mat))*p(ada|nonsyn) = 
- = p_mat*(1-p_mat_syn)*p_ada_nonsyn
-"""
-
-
-def get_mut_type_probs_per_gene_lst(
-    p_protein,
-    p_protein_syn,
-    p_ada_syn,
-    p_ada_nonsyn,
-    p_protein_syn_rec,
-    p_protein_nonsyn_rec,
-):
-    """
-    Args:
-        p_protein (float): p(protein)
-        p_protein_syn (float): p(syn|protein)
-        p_ada_syn (float): p(ada|syn)
-        p_ada_nonsyn (float): p(ada|nonsyn)
-        p_protein_syn_rec (float): p(rec|protein,!ada, syn)
-        p_protein_nonsyn_rec (float): p(rec|protein,!ada, nonsyn)
-    Returns:
-        list: [p(protein, syn, !ada, rec), p(protein, syn, !ada, dom), p(protein, nonsyn, !ada, rec),
-               p(protein, nonsyn, !ada, dom), p(protein, syn, ada), p(protein, nonsyn, ada)]
-    """
-
-    P_sr = p_protein_syn * (1 - p_ada_syn) * p_protein_syn_rec
-    P_sd = p_protein_syn * (1 - p_ada_syn) * (1 - p_protein_syn_rec)
-    P_nsr = (1 - p_protein_syn) * (1 - p_ada_nonsyn) * p_protein_nonsyn_rec
-    P_nsd = (1 - p_protein_syn) * (1 - p_ada_nonsyn) * (1 - p_protein_nonsyn_rec)
-    P_sb = p_protein_syn * p_ada_syn
-    P_nsb = (1 - p_protein_syn) * p_ada_nonsyn
-
-    return [P_sr, P_sd, P_nsr, P_nsd, P_sb, P_nsb]
-
 
 #############################################################
 # Simplified model:
@@ -208,10 +147,6 @@ def get_mut_type_probs_per_gene_lst(
 #          + [total_nonsyn_adaptive, total_syn_adaptive, total_syn_nonadaptive]
 # first: [nonsyn_rec, nonsyn_dom, nonsyn_ada, syn_ada, syn_nonada] per protein
 # after: sum syn_ada, syn_nonada, nonsyn_ada across proteins and get the final genotype.
-# existing functions that will change:
-# get_mut_type_probs_per_gene_lst, gather_muts_by_fitness_new, wrangle_data
-# new functions:
-# collapse_into_genotype_structure
 #############################################################
 
 """
@@ -265,45 +200,16 @@ def get_mut_type_probs_per_gene_lst_simp_model(
     return [P_nsr, P_nsd, P_nsb, P_sb, P_s]
 
 
-def collapse_into_simplified_geno_structure(full_genotype_dict):
-    """
-    creates a genotype [protein_nonsyn_rec, protein_nonsyn_dom, protein_nonsyn_ada] X4
-     + [total_syn_adaptive, total_syn_nonadaptive] from this genotype:
-     [nonsyn_rec, nonsyn_dom, nonsyn_ada, syn_ada, syn_nonada] per protein
-    Args:
-        full_genotype_dict (dict):
-            dictionary of genotypes (20-length - 5 values per gene) and the probability to see this genotype
-    Returns:
-        simplified genotype dictionary (14-length - 3 nonsyn values per gene and 2 global genome values - syn mutations)
-        and the probability to see this genotype
-    """
-    new_geno_dict = defaultdict(float)
-
-    genos_arr = np.array(list(full_genotype_dict.keys()))
-    freqs_lst = list(full_genotype_dict.values())
-    geno_num = genos_arr.shape[0]
-    nonsyn_by_prot = genos_arr[:, [0, 1, 2, 5, 6, 7, 10, 11, 12, 15, 16, 17]]
-    tot_syn_ada = np.sum(genos_arr[:, [3, 8, 13, 18]], axis=1).reshape(geno_num, 1)
-    tot_syn_nonada = np.sum(genos_arr[:, [4, 9, 14, 19]], axis=1).reshape(geno_num, 1)
-    new_geno_arr = np.hstack([nonsyn_by_prot, tot_syn_ada, tot_syn_nonada])
-
-    for i in range(len(new_geno_arr)):
-        new_geno_dict[tuple(new_geno_arr[i])] += freqs_lst[i]
-
-    return new_geno_dict
 
 
 def collapse_into_simplified_geno_structure_fast(full_genotype_dict):
-    # 1. Create a DataFrame directly
     df = pd.DataFrame(list(full_genotype_dict.keys()))
     df["prob"] = list(full_genotype_dict.values())
 
-    # 2. Define your columns (same indices as your code)
     nonsyn_cols = [0, 1, 2, 5, 6, 7, 10, 11, 12, 15, 16, 17]
     syn_ada_cols = [3, 8, 13, 18]
     syn_nonada_cols = [4, 9, 14, 19]
 
-    # 3. Perform the aggregation
     simplified = pd.DataFrame()
     for i, col_idx in enumerate(nonsyn_cols):
         simplified[i] = df[col_idx]
@@ -312,7 +218,6 @@ def collapse_into_simplified_geno_structure_fast(full_genotype_dict):
     simplified["tot_syn_nonada"] = df[syn_nonada_cols].sum(axis=1)
     simplified["prob"] = df["prob"]
 
-    # 4. Group by all columns except 'prob' and sum the probabilities
     final_df = simplified.groupby(
         list(range(len(nonsyn_cols))) + ["tot_syn_ada", "tot_syn_nonada"]
     ).sum()
@@ -320,32 +225,6 @@ def collapse_into_simplified_geno_structure_fast(full_genotype_dict):
     return final_df["prob"].to_dict()
 
 
-def gather_muts_by_fitness_simplified(simplified_genotypes):
-    """
-    create a sub genotype matrix with columns for the dominant mutations (recessive mutations have fitness 1 and
-    therefore we exclude them) and a column for the sum of beneficial (syn+nonsyn) mutations.
-    the output of this function is used for the fitness calculation
-    (w prameters are raised to the power of mutation numbers - rows of the matrix)
-    genotype sturcture:
-    [mat_ns_rec, mat_ns_dom, mat_ns_ada, cp_ns_rec, cp_ns_dom,cp_ns_ada, lys_ns_rec, lys_ns_dom, lys_ns_ada, rep_ns_rec,
-    rep_ns_dom, rep_ns_ada, tot_syn_ada, tot_syn_nonada]
-
-    arguments:
-    genotyps -- 2D array of shape (N,tup_size=11) of all genotypes
-
-    return a matrix of partial genotypes - (K_sd | K_nsd | sum(K_sb, K_nsb))
-    """
-    syn_nonada = simplified_genotypes[:, 13].reshape(-1, 1)
-    nonsyn_dominant = np.sum(simplified_genotypes[:, [1, 4, 7, 10]], axis=1).reshape(
-        -1, 1
-    )
-    all_beneficial_muts = np.sum(
-        simplified_genotypes[:, [2, 5, 8, 11, 12]], axis=1
-    ).reshape(-1, 1)  # nonsyn per gene + total syn
-    gathered_df = np.concatenate(
-        [syn_nonada, nonsyn_dominant, all_beneficial_muts], axis=1
-    )
-    return gathered_df
 
 
 def gather_muts_by_fitness_simplified_by_gene(simplified_genotypes):
@@ -385,16 +264,16 @@ def gather_muts_by_fitness_simplified_by_gene(simplified_genotypes):
     return gathered_df
 
 
-################################################################################################
 
-################################################################################################
-
-
-def genotype_probabilities(
+def genotype_probabilities_with_audit(
     gene_mutation_distribution, mutation_type_probs_per_gene, min_freq
 ):
-    """
-    Computes the full genotype distribution across all genes.
+        """
+    Compute the probability distribution over full mutation-type genotype vectors.
+    For each possible allocation of mutations across genes, this function enumerates
+    all possible assignments of those mutations into mutation classes within each gene
+    and combines them into full genotype vectors. Genotypes whose joint probability is
+    below `min_freq` are discarded to keep the state space computationally tractable.
 
     Args:
         gene_mutation_distribution (dict):
@@ -402,53 +281,19 @@ def genotype_probabilities(
             Values are the probability of that total mutation distribution.
             (output of expand_mutation_combinations)
 
-        mutation_type_probs_per_gene (list of list of float):
-            A list of 4 elements, each a list of 6 probabilities summing to p_protein (sum(mutation_type_probs_per_gene)= 1):
-            [P(protein,syn,rec), P(protein,syn,dom), P(protein,nonsyn,rec),
-            P(protein,nonsyn,dom), P(protein,syn,adapt), P(protein,nonsyn,adapt)]
+        mutation_type_probs_per_gene : list of list of float
+            For each gene, a list of probabilities for the possible mutation classes
+            used by the model.
+    
+        min_freq : float
+            Minimum probability threshold. Mutation-type combinations or full genotype
+            vectors with probability below this value are excluded.]
 
     Returns:
         dict:
-            Keys are 24-length tuples: (6 mutation types × 4 genes)
+            Keys are 20-length tuples: (5 mutation types × 4 genes)
             Values are the total probabilities of observing each genotype.
     """
-
-    genotype_dict = dict()
-
-    # iterate over mutation distribution over genes (k1,k2,k3,k4)
-    for gene_counts, p_gene_counts in gene_mutation_distribution.items():
-        gene_type_options = []  # this will be a list of 4 lists, each a tuple of (6-length vector, prob of this partition), one list per gene.
-        # iterate over each gene in the specific combination
-        for gene_idx, mut_count in enumerate(gene_counts):
-            gene_type_probs = mutation_type_probs_per_gene[
-                gene_idx
-            ]  # get probs for this gene
-            combos = gene_mutation_type_combinations(
-                mut_count, gene_type_probs, min_freq
-            )  # get all combinations of mutation types given the number of mutations in this gene
-            gene_type_options.append(list(combos.items()))
-
-        # compute cartesian product - all combinations of one vector from each gene
-        for combination in itertools.product(*gene_type_options):
-            mutation_vectors, probs = zip(
-                *combination
-            )  # extract mutation vectors and probabilities
-            genotype_vector = sum(mutation_vectors, ())  # Flatten to 24-length
-            joint_prob = (
-                p_gene_counts * np.prod(probs)
-            )  # prob of seeing this mut distribution * product of all probs of this assigned combination
-            genotype_dict[genotype_vector] = joint_prob
-
-    return {
-        genotype_vector: prob
-        for genotype_vector, prob in genotype_dict.items()
-        if prob > min_freq
-    }  # min_freq is the same along the way, may need to lower it here becuase I multiply 4 probs..
-
-
-def genotype_probabilities_with_audit(
-    gene_mutation_distribution, mutation_type_probs_per_gene, min_freq
-):
     genotype_dict = {}
     total_leaked_prob = 0.0
 
@@ -464,7 +309,6 @@ def genotype_probabilities_with_audit(
                 break
             gene_type_options.append(list(combos.items()))
         else:
-            # Only runs if the for-loop didn't 'break'
             for combination in itertools.product(*gene_type_options):
                 joint_prob = p_gene_counts * np.prod([c[1] for c in combination])
                 if joint_prob > min_freq:
@@ -537,30 +381,11 @@ def gather_muts_by_fitness_new(genotypes):
     return np.concatenate([syn_dominant, nonsyn_dominant, all_beneficial_muts], axis=1)
 
 
-def selection_new(fitness_effects, muts_by_fitness, freqs):
-    """
-    calculate the fitness of each genotype according to the fitness parameters (syn, nonsyn, benefical)
-    and the frequencies of the genotypes.
-
-    arguments:
-    fitness_effects -- list of fitness params [w_syn, w_non_syn, w_b]
-    muts_by_fitness -- 2D array of genotypes (muts combinations)
-    where the last column is the sum of the beneficial (syn and non-syn) mutations
-    freqs -- vector (1D array) of frequency of each genotype in muts_by_fitness
-
-
-    returns a vector of fitness values for each genotype that appears in muts_by_fitness
-    """
-    fitness = np.product(np.power(fitness_effects, muts_by_fitness), axis=1).reshape(-1)
-    avg_fitness = np.sum(freqs * fitness)  # normalization
-    fitness /= avg_fitness
-    return fitness
 
 
 def get_raw_fitness(fitness_effects, genotypes, simplified=True):
     """Calculates non-normalized fitness for a matrix of genotypes."""
     if simplified:
-        # Assuming you have this helper or use the logic from gather_muts_by_fitness_new
         mbf = gather_muts_by_fitness_simplified_by_gene(genotypes)
     else:
         mbf = gather_muts_by_fitness_new(genotypes)
@@ -570,97 +395,7 @@ def get_raw_fitness(fitness_effects, genotypes, simplified=True):
     return fitness
 
 
-def mutate_and_select_new(
-    genotypes,
-    genotypes_freqs,
-    mutations,
-    mutations_freqs,
-    fitness_effects,
-    tuple_size,
-    simplified=True,
-):
-    """
-    add to each existing genotype all optional mutation combinations,
-    calculate the mutated genotypes frequencies based on the freq of the genotype before mutating
-    and the freq of the mutation combination. then preform selection based on the new frequencies and the fitness params.
 
-    arguments:
-    genotypes -- array of shape (num_of_genotypes, 1, 24) of genotypes.
-    the shape is important for the broadcasting -> creating all new genotypes: previous genotype + mutation combinations
-    [[[k1,k2,..,k24]],[[genotype2]],...]
-    genotypes_freqs -- array of shape(num_of_genotypes, 1, 1) [[[freq1]],[[freq2]],...]
-    mutations -- np array of all combinations of mutations
-    mutations_freqs -- np array of probabilities to observe each mutation combination
-    pop_size -- fixed size of population (Wright Fisher model)
-    tuple_size -- size of the vector of tracked types of mutations (24)
-    simplified -- bool if true uses the gather_mutations_simplified func
-
-    returns a list of: tuples of all new genotypes (as tuples) and a 1D array of new frequencies after selection
-    """
-    # do that numpy magic:
-    new_genotypes = genotypes + mutations
-    # print(f"\nsize of genotypes after mutating: {new_genotypes.shape}\n")
-    new_genotypes = new_genotypes.reshape(-1, tuple_size)
-    new_freqs = genotypes_freqs * mutations_freqs  # mutation
-    new_freqs = new_freqs.reshape(-1)
-    if simplified:
-        muts_by_fitness = gather_muts_by_fitness_simplified(new_genotypes)
-    else:
-        muts_by_fitness = gather_muts_by_fitness_new(new_genotypes)
-    fitness = selection_new(fitness_effects, muts_by_fitness, new_freqs)
-    new_genotypes = list(map(tuple, new_genotypes))
-    new_freqs = new_freqs * fitness
-
-    return new_genotypes, new_freqs
-
-
-def mutate_and_select_optimized(
-    genotypes,
-    genotypes_freqs,
-    mutations,
-    mutations_freqs,
-    fitness_effects,
-    tuple_size,
-    simplified=True,
-    batch_size=100,
-):
-    freqs_dict = defaultdict(float)
-    n_mutations = len(mutations)
-
-    # Process mutations in batches to avoid huge memory allocation
-    for batch_start in range(0, n_mutations, batch_size):
-        batch_end = min(batch_start + batch_size, n_mutations)
-
-        batch_mutations = mutations[batch_start:batch_end]
-        batch_mut_freqs = mutations_freqs[batch_start:batch_end]
-
-        # Create batched new genotypes
-        new_genotypes_batch = genotypes + batch_mutations
-        new_genotypes_batch = new_genotypes_batch.reshape(-1, tuple_size)
-
-        # Calculate frequencies for this batch
-        new_freqs_batch = genotypes_freqs * batch_mut_freqs
-        # print(f'freqs shape (batched) before numpy magic: {new_freqs_batch.shape}')
-        new_freqs_batch = new_freqs_batch.reshape(-1)
-        # print(f'freqs shape (batched) after numpy magic: {new_freqs_batch.shape}')
-
-        # Selection for this batch
-        if simplified:
-            muts_by_fitness = gather_muts_by_fitness_simplified(new_genotypes_batch)
-        else:
-            muts_by_fitness = gather_muts_by_fitness_new(new_genotypes_batch)
-        # print(f'muts by fitness (batched): {muts_by_fitness.shape}')
-        fitness = selection_new(fitness_effects, muts_by_fitness, new_freqs_batch)
-        new_freqs_batch = new_freqs_batch * fitness
-
-        # Accumulate results
-        for genotype, freq in zip(map(tuple, new_genotypes_batch), new_freqs_batch):
-            freqs_dict[genotype] += freq
-
-        # Clean up batch arrays
-        del new_genotypes_batch, new_freqs_batch, muts_by_fitness, fitness
-
-    return freqs_dict
 
 
 def normalize_freqs_dict(freqs_dict, pop_size):
@@ -679,62 +414,6 @@ def normalize_freqs_dict(freqs_dict, pop_size):
     return freqs_dict
 
 
-def simulate_next_passage_new(
-    fitness_effects, passage, mutations, pop_size, simplified, batch_size=100
-):
-    """
-    creates arrays of the genotypes and the genotypes_freqs in the shape needed for the mutate stage.
-    calls 'mutate_and_select' and get the genotypes and freqs after mutation and selection.
-    normalizes the frequencies and simulates drift by sampling from multinomial distribution.
-
-    arguments:
-    fitnes_effects -- list of fitness parameters. defined in the simulator. [w_s, w_ns, w_b]
-    passage -- dict of genotypes of that specific passage and their frequencies. {(genotype_i):freq_i}
-    mutations -- dict of the mutation combinations and the probability to see each one. {(mut_comb_i):prob_i}
-
-    returns dict of the new genotypes that were generated in this passage and their frequencies. {(new_geno_i):new_freq_i}
-    """
-    # turn dict into arrays:
-    tuple_size = len(
-        list(passage.keys())[0]
-    )  # tup_size = 24 or 11 (depends on if simplified or not)
-    genotypes = np.array(list(passage.keys()), dtype=np.uint16).reshape(
-        -1, 1, tuple_size
-    )
-    genotypes_freqs = np.array(list(passage.values()), dtype=np.float32).reshape(
-        -1, 1, 1
-    )
-    mutation_keys = np.array(list(mutations.keys()), dtype=np.uint8)
-    mutation_freqs = np.array(list(mutations.values()), dtype=float)
-
-    # new_genotypes, new_freqs = mutate_and_select_new(genotypes, genotypes_freqs, mutation_keys,
-    #                                                  mutation_freqs, fitness_effects, tuple_size, simplified)
-    # freqs_dict = defaultdict(float)
-    # for mut, freq in zip(new_genotypes, new_freqs):
-    #     freqs_dict[mut] += freq
-
-    freqs_dict = mutate_and_select_optimized(
-        genotypes,
-        genotypes_freqs,
-        mutation_keys,
-        mutation_freqs,
-        fitness_effects,
-        tuple_size,
-        simplified,
-        batch_size,
-    )
-
-    # Clean up large arrays immediately
-    del genotypes, genotypes_freqs, mutation_keys, mutation_freqs
-    gc.collect()
-
-    freqs_dict = normalize_freqs_dict(freqs_dict, pop_size)
-    freqs_dict = multinomial_sampling(freqs_dict, pop_size)  # drift
-    # print(
-    #     f"\n evo_model prints:\nsimulate next passage new output len:\n{len(freqs_dict)}\n"
-    # )
-    return freqs_dict
-
 
 def simulate_next_passage_final(
     fitness_effects, passage, mutations, pop_size, simplified, chunk_size=500
@@ -742,7 +421,6 @@ def simulate_next_passage_final(
     """
     Complete passage simulation: Mutation -> Selection -> Chunked Aggregation -> Drift.
     """
-    # 1. Prepare Arrays with memory-efficient types
     tuple_size = len(list(passage.keys())[0])
 
     # Existing genotypes in the population
@@ -755,7 +433,6 @@ def simulate_next_passage_final(
 
     all_chunks = []
 
-    # 2. Chunked Mutation & Selection
     for i in range(0, len(genotypes), chunk_size):
         g_chunk = genotypes[i : i + chunk_size]
         f_chunk = genotypes_freqs[i : i + chunk_size]
@@ -767,11 +444,10 @@ def simulate_next_passage_final(
         new_freqs = (f_chunk[:, np.newaxis] * mutation_freqs).reshape(-1)
 
         # Apply raw fitness (Selection)
-        # Assuming gather_muts_by_fitness logic is inside get_raw_fitness
         fitness_raw = get_raw_fitness(fitness_effects, new_genos, simplified)
         new_freqs *= fitness_raw
 
-        # Early Collapse: Combine identical genotypes within this chunk
+        # Combine identical genotypes within this chunk
         df_chunk = pd.DataFrame(new_genos)
         df_chunk["f"] = new_freqs
         # Group by all genotype columns and sum frequencies
@@ -780,114 +456,26 @@ def simulate_next_passage_final(
         )
         all_chunks.append(collapsed)
 
-    # 3. Global Aggregation
     # Combine all chunk-summaries into one master DataFrame
     full_df = pd.concat(all_chunks).groupby(list(range(tuple_size)), sort=False).sum()
 
-    # 4. Global Normalization
-    # This is where 'Average Fitness' happens correctly across the whole population
+    # Normalization
     total_mass = full_df["f"].sum()
     full_df["f"] /= total_mass
 
     # Convert to dictionary for the Drift/Sampling function
     freqs_dict = {tuple(k): v for k, v in zip(full_df.index, full_df["f"])}
 
-    # 5. Clean up memory
     del genotypes, mutation_keys, all_chunks, full_df
     gc.collect()
 
-    # 6. Drift (Multinomial Sampling)
+    # Drift (Multinomial Sampling)
     # Prune extreme rare events and sample based on pop_size
     freqs_dict = normalize_freqs_dict(freqs_dict, pop_size)
     freqs_dict = multinomial_sampling(freqs_dict, pop_size)
 
     return freqs_dict
 
-
-def wrangle_data(passage):
-    """
-    creates a dataframe containing all genotypes and frequencies in each passage.
-
-    arguments:
-    passage -- nested dict. inner dict - genotype:freq. outer dict - passage_number {passage_i:{genotype_j:freq_j,..},..}
-
-    returns data frame that summarizes the genotypes and frequencies by mut type and passage. columns are:
-    syn_recessive | syn_dominant | non-syn_recessive | non-syn_dominant | syn_beneficial | non-syn_beneficial | X 4 (per gene)
-    passage_i | all_muts | syn_non_ben | non_syn_non_ben | recessive_non_ben | dominant_non_ben | syn_total | non_syn_total
-    """
-    data = pd.DataFrame(passage)
-    data["all_muts"] = [sum(x) for x in data.index]
-    data = (
-        data.reset_index()
-        .rename(
-            columns={
-                "level_0": "mat_syn_recessive",
-                "level_1": "mat_syn_dominant",
-                "level_2": "mat_nonsyn_recessive",
-                "level_3": "mat_nonsyn_dominant",
-                "level_4": "mat_syn_ada",
-                "level_5": "mat_nonsyn_ada",
-                "level_6": "cp_syn_recessive",
-                "level_7": "cp_syn_dominant",
-                "level_8": "cp_nonsyn_recessive",
-                "level_9": "cp_nonsyn_dominant",
-                "level_10": "cp_syn_ada",
-                "level_11": "cp_nonsyn_ada",
-                "level_12": "lys_syn_recessive",
-                "level_13": "lys_syn_dominant",
-                "level_14": "lys_nonsyn_recessive",
-                "level_15": "lys_nonsyn_dominant",
-                "level_16": "lys_syn_ada",
-                "level_17": "lys_nonsyn_ada",
-                "level_18": "rep_syn_recessive",
-                "level_19": "rep_syn_dominant",
-                "level_20": "rep_nonsyn_recessive",
-                "level_21": "rep_nonsyn_dominant",
-                "level_22": "rep_syn_ada",
-                "level_23": "rep_nonsyn_ada",
-            }
-        )
-        .fillna(0)
-    )
-
-    data["mat_total_syn"] = (
-        data["mat_syn_recessive"] + data["mat_syn_dominant"] + data["mat_syn_ada"]
-    )
-    data["cp_total_syn"] = (
-        data["cp_syn_recessive"] + data["cp_syn_dominant"] + data["cp_syn_ada"]
-    )
-    data["lys_total_syn"] = (
-        data["lys_syn_recessive"] + data["lys_syn_dominant"] + data["lys_syn_ada"]
-    )
-    data["rep_total_syn"] = (
-        data["rep_syn_recessive"] + data["rep_syn_dominant"] + data["rep_syn_ada"]
-    )
-
-    data["mat_total_nonsyn"] = (
-        data["mat_nonsyn_recessive"]
-        + data["mat_nonsyn_dominant"]
-        + data["mat_nonsyn_ada"]
-    )
-    data["cp_total_nonsyn"] = (
-        data["cp_nonsyn_recessive"] + data["cp_nonsyn_dominant"] + data["cp_nonsyn_ada"]
-    )
-    data["lys_total_nonsyn"] = (
-        data["lys_nonsyn_recessive"]
-        + data["lys_nonsyn_dominant"]
-        + data["lys_nonsyn_ada"]
-    )
-    data["rep_total_nonsyn"] = (
-        data["rep_nonsyn_recessive"]
-        + data["rep_nonsyn_dominant"]
-        + data["rep_nonsyn_ada"]
-    )
-
-    # add more columns if needed for a more detailed summary statistic (for example one with tagged adaptive muts)
-
-    # print(
-    #     f"wrangel data func - memory usage of one simulation: {data.memory_usage(deep=True).sum()}"
-    # )
-    return data
 
 
 def wrangle_data_simplified(passage):
@@ -971,41 +559,9 @@ def wrangle_data_simplified(passage):
         + data["total_syn_ada"]
     )
 
-    # add more columns if needed for a more detailed summary statistic (for example one with tagged adaptive muts)
-    # print(
-    #     f"wrangel data func - memory usage of one simulation: {data.memory_usage(deep=True).sum()}"
-    # )
     return data
 
 
-def get_short_sumstat(df, passages_lst, tensor=True):
-    """
-    creates the SR summary statistic.
-
-    arguments:
-    df -- the output df from 'wrangle_data'
-    passages_lst -- list of the sequenced passages [5,8,10] for MOI10
-    tensor -- bool, determines weather to return a torch.Tenor or a numpy array
-
-    retruns a vector of size 8*len(passages) with the sum of syn_num*freq and nonsyn_num*freq for the given passages.
-    """
-    ret = list()
-    for passage in passages_lst:
-        print(f"{passage=}\n")
-        ret.append(
-            sum(df["mat_total_syn"] * df[passage])
-        )  # sum of: total num of mat syn muts * freq of this genotype in the passage
-        ret.append(sum(df["cp_total_syn"] * df[passage]))
-        ret.append(sum(df["lys_total_syn"] * df[passage]))
-        ret.append(sum(df["rep_total_syn"] * df[passage]))
-        ret.append(sum(df["mat_total_nonsyn"] * df[passage]))
-        ret.append(sum(df["cp_total_nonsyn"] * df[passage]))
-        ret.append(sum(df["lys_total_nonsyn"] * df[passage]))
-        ret.append(sum(df["rep_total_nonsyn"] * df[passage]))
-    if tensor:
-        return torch.Tensor(ret)
-    else:
-        return np.array(ret)
 
 
 def get_sumstat_simplified(df, passages_lst, tensor=True):
@@ -1067,30 +623,6 @@ def get_expanded_sumstat_simplified(df, passages_lst):
     return torch.Tensor(ret)
 
 
-def get_genotype_sumstat(df):
-    max_muts = 9  # so 8 maximum muts
-    new_index = [
-        (mat, cp, lys, rep, ada, syn)
-        for mat in range(max_muts)
-        for cp in range(max_muts)
-        for lys in range(max_muts)
-        for rep in range(max_muts)
-        for ada in range(max_muts)
-        for syn in range(max_muts)
-        if mat + cp + lys + rep + ada + syn < max_muts
-    ]
-    grouped = df.groupby(
-        [
-            "mat_nonsyn_nonada",
-            "cp_nonsyn_nonada",
-            "lys_nonsyn_nonada",
-            "rep_nonsyn_nonada",
-            "ada_total",
-            "total_syn_nonada",
-        ]
-    )[10].sum()
-    return torch.Tensor(grouped.reindex(new_index).fillna(0).values.flatten())
-
 
 def get_full_geno_sumstat(df):
     binned_categories = [
@@ -1114,7 +646,6 @@ def get_full_geno_sumstat(df):
 
     def generate_indexing(n_categories, max_total):
         # This generates all tuples (k1, k2, ..., kn) where sum(ki) <= max_total
-        # We use max_total as the number of 'stars' and n_categories as 'bars'
         # Adding a slack variable (n + 1) handles the "<" constraint
         for combo in combinations(range(n_categories + max_total), n_categories):
             res = []
@@ -1158,16 +689,14 @@ def get_full_geno_sumstat_all_passages(df):
 
     binned_names = [f"{col}_binned" for col in binned_categories]
 
-    # 1. Apply Binning Transformation to the genotype rows
     for col in binned_categories:
         new_col_name = f"{col}_binned"
-        # Ensure the column exists before applying
         if col in df.columns:
             df[new_col_name] = df[col].apply(
                 lambda x: (int(x) + 1) // 2 if x > 0 else 0
             )
 
-    # 2. Reconstruct the static indexing (3003 entries)
+    # Reconstruct the static indexing (3003 entries)
     def generate_indexing(n_categories, max_total):
         for combo in combinations(range(n_categories + max_total), n_categories):
             res = []
@@ -1180,7 +709,6 @@ def get_full_geno_sumstat_all_passages(df):
     # 3003 genotypes based on stars and bars: bin_sum <= 5
     new_index = list(generate_indexing(10, 5))
 
-    # 3. Iterate through passage columns '1' to '10'
     passage_stats = []
     for p in range(1, 11):
         # p_col = int(p)  # Using string if column names are '1', '2', etc.
@@ -1198,7 +726,6 @@ def get_full_geno_sumstat_all_passages(df):
         p_vector = torch.Tensor(grouped.reindex(new_index).fillna(0).values.flatten())
         passage_stats.append(p_vector)
 
-    # 4. Concatenate into a single 30,030 entry vector
     return torch.cat(passage_stats)
 
 

@@ -49,10 +49,6 @@ def append_sims_from_batches_dir(xs, thetas, batches_dir):
     for batch_name in os.listdir(batches_dir):
         if ("parameters" in batch_name) or ("README" in batch_name):
             continue
-        # if ((int(batch_name[6:]) > 40)):
-        #     break
-        # (int(batch_name[6:]) < 38) and (int(batch_name[6:])!=24)
-        # JUST FOR TRAINING ON A SMALL DATA SET, SINCE NOT ALL DIRS ARE READY. batch 24 is empty.
         print(f"{batch_name=}", flush=True)
         batch_path = os.path.join(batches_dir, batch_name)
         xs.append(torch.load(os.path.join(batch_path, "x_all_passages.pt")))
