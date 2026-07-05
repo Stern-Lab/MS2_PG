@@ -58,7 +58,7 @@ MODEL_B_EMPIRICAL_DIR = RESULTS_DIR / "stage2_empirical_results"
 
 
 # ---------------------------------------------------------------------
-# Generate Model A simulations
+# Generate Stage 1 simulations
 # ---------------------------------------------------------------------
 
 def generate_stage1_simulations():
@@ -99,7 +99,7 @@ def generate_stage1_simulations():
 
 
 # ---------------------------------------------------------------------
-# Train Model A posterior
+# Train Stage 1 posterior
 # ---------------------------------------------------------------------
 
 def train_stage1_posterior():
