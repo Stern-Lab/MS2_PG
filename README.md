@@ -69,7 +69,7 @@ Workflow:
 3. Train neural density estimator
 4. Infer posterior distributions of parameters
 
-See `model/` for implementation details.
+See `model/` for implementation details and `model/inferece_pipeline_overview.py` for pipeline overview.
 
 
 ---
